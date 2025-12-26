@@ -1,16 +1,13 @@
-export const metadata = {
-  title: "CONTROL HUB",
-  description: "CONTROL HUB staging"
-};
+import type { ReactNode } from 'react';
+import Topbar from './_components/Topbar';
 
-export default function RootLayout({
-  children
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Topbar />
+        <div style={{ padding: 24 }}>{children}</div>
+      </body>
     </html>
   );
 }
