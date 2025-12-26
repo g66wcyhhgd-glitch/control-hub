@@ -13,7 +13,7 @@ export async function getActiveProjectId(): Promise<string | null> {
 
 /**
  * Устанавливаем активный проект в cookie.
- * Перед установкой проверяем доступ к проекту через RLS (select projects).
+ * Перед установкой проверяем доступ кпроекту через RLS (select projects).
  */
 export async function setActiveProjectId(projectId: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
