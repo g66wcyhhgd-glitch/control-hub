@@ -1,8 +1,9 @@
+// apps/web/app/projects/[id]/page.tsx
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { getProjectById, listProjectMembers } from '@/lib/data/projects';
 import { archiveProjectAction, openProjectAction, renameProjectAction } from '../actions';
-import { addMemberAction, removeMemberAction } from './member-actions';
 
 export default async function ProjectPage({ params }: { params: { id: string } }) {
   const project = await getProjectById(params.id);
@@ -34,6 +35,8 @@ export default async function ProjectPage({ params }: { params: { id: string } }
         </form>
 
         <a href={`/projects/${project.id}/audit`}>Audit</a>
+        <Link href="/team">Team</Link>
+        <Link href="/invites">Invites</Link>
       </div>
 
       <section style={{ padding: 16, border: '1px solid #e5e5e5', borderRadius: 8 }}>
@@ -49,35 +52,11 @@ export default async function ProjectPage({ params }: { params: { id: string } }
       </section>
 
       <section style={{ padding: 16, border: '1px solid #e5e5e5', borderRadius: 8 }}>
-        <h2 style={{ marginTop: 0 }}>Members</h2>
+        <h2 style={{ marginTop: 0 }}>Members (read-only here)</h2>
 
-        <form
-          action={addMemberAction}
-          style={{
-            display: 'flex',
-            gap: 8,
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            marginBottom: 12,
-          }}
-        >
-          <input type="hidden" name="projectId" value={project.id} />
-          <input
-            name="userId"
-            placeholder="user_id (uuid)"
-            required
-            style={{ minWidth: 320 }}
-          />
-          <select name="role" defaultValue="member">
-            <option value="member">member</option>
-            <option value="owner">owner</option>
-          </select>
-          <button type="submit">Add member</button>
-
-          <div style={{ fontSize: 12, opacity: 0.75 }}>
-            UUID пользователя бери в Supabase → Authentication → Users.
-          </div>
-        </form>
+        <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>
+          По ТЗ #2 добавление участников делается только через приглашения: /invites. Управление ролями/удаление — на /team.
+        </div>
 
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -86,7 +65,6 @@ export default async function ProjectPage({ params }: { params: { id: string } }
                 <th style={{ padding: 8 }}>user_id</th>
                 <th style={{ padding: 8 }}>role</th>
                 <th style={{ padding: 8 }}>created_at</th>
-                <th style={{ padding: 8 }}>actions</th>
               </tr>
             </thead>
             <tbody>
@@ -97,29 +75,18 @@ export default async function ProjectPage({ params }: { params: { id: string } }
                     <b>{m.role_in_project}</b>
                   </td>
                   <td style={{ padding: 8, whiteSpace: 'nowrap' }}>{m.created_at}</td>
-                  <td style={{ padding: 8 }}>
-                    <form action={removeMemberAction}>
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <input type="hidden" name="userId" value={m.user_id} />
-                      <button type="submit">Remove</button>
-                    </form>
-                  </td>
                 </tr>
               ))}
 
               {members.length === 0 && (
                 <tr>
-                  <td style={{ padding: 12 }} colSpan={4}>
+                  <td style={{ padding: 12 }} colSpan={3}>
                     No members
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
-
-        <div style={{ fontSize: 12, opacity: 0.75, marginTop: 10 }}>
-          Важно: добавлять/удалять участников сможет только владелец проекта (owner) или admin — так настроен RLS.
         </div>
       </section>
     </main>
