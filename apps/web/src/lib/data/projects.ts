@@ -1,8 +1,7 @@
 // apps/web/src/lib/data/projects.ts
 import 'server-only';
 
-import { createSupabaseServerClient } from '../supabase/server';
-
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export type ProjectStatus = 'active' | 'archived';
 
