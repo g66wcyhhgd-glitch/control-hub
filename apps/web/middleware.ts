@@ -14,6 +14,7 @@ function isPublicPath(pathname: string) {
   return (
     pathname.startsWith('/login') ||
     pathname.startsWith('/projects') ||
+    pathname.startsWith('/invites') || // TZ#2: allow accept invite without active project
     pathname.startsWith('/auth') ||
     pathname.startsWith('/api')
   );
@@ -52,7 +53,8 @@ export async function middleware(request: NextRequest) {
 
   // 3) Project guard (только для непубличных путей)
   if (!isPublicPath(pathname)) {
-    const activeProjectId = request.cookies.get(ACTIVE_PROJECT_COOKIE)?.value ?? null;
+    const activeProjectId =
+      request.cookies.get(ACTIVE_PROJECT_COOKIE)?.value ?? null;
 
     if (!activeProjectId) {
       const url = request.nextUrl.clone();
