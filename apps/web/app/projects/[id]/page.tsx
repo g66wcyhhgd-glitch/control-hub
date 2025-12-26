@@ -13,7 +13,7 @@ export default async function ProjectPage({ params }: { params: { id: string } }
     <main style={{ display: 'grid', gap: 16 }}>
       <h1 style={{ margin: 0 }}>{project.name}</h1>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <form action={openProjectAction}>
           <input type="hidden" name="projectId" value={project.id} />
           <button type="submit">Set as active</button>
@@ -31,12 +31,20 @@ export default async function ProjectPage({ params }: { params: { id: string } }
             Archive
           </button>
         </form>
+
+        <a href={`/projects/${project.id}/audit`}>Audit</a>
       </div>
 
       <section style={{ padding: 16, border: '1px solid #e5e5e5', borderRadius: 8 }}>
-        <div><b>project_key:</b> {project.project_key}</div>
-        <div><b>status:</b> {project.status}</div>
-        <div><b>created_at:</b> {project.created_at}</div>
+        <div>
+          <b>project_key:</b> {project.project_key}
+        </div>
+        <div>
+          <b>status:</b> {project.status}
+        </div>
+        <div>
+          <b>created_at:</b> {project.created_at}
+        </div>
       </section>
 
       <section style={{ padding: 16, border: '1px solid #e5e5e5', borderRadius: 8 }}>
