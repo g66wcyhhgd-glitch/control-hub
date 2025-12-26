@@ -18,19 +18,32 @@ export type ProjectListItem = ProjectRow & {
   members_count: number;
 };
 
-function mustAuthUserId(userId: string | null | undefined): string {
-  if (!userId) throw new Error('UNAUTHORIZED');
-  return userId;
+export type ProjectMemberRow = {
+  project_id: string;
+  user_id: string;
+  role_in_project: 'owner' | 'member';
+  created_at: string;
+};
+
+async function getUserIdOrNull(): Promise<string | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.getUser();
+  if (error) return null;
+  return data.user?.id ?? null;
+}
+
+async function requireUserId(): Promise<string> {
+  const id = await getUserIdOrNull();
+  if (!id) throw new Error('UNAUTHORIZED');
+  return id;
 }
 
 export async function getMyProjects(): Promise<ProjectListItem[]> {
+  const userId = await getUserIdOrNull();
+  if (!userId) return []; // <-- больше не падаем 500
+
   const supabase = await createSupabaseServerClient();
 
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr) throw new Error(authErr.message);
-  mustAuthUserId(authData.user?.id);
-
-  // count участников через relation project_members
   const { data, error } = await supabase
     .from('projects')
     .select(
@@ -55,11 +68,10 @@ export async function getMyProjects(): Promise<ProjectListItem[]> {
 }
 
 export async function getProjectById(projectId: string): Promise<ProjectRow | null> {
-  const supabase = await createSupabaseServerClient();
+  const userId = await getUserIdOrNull();
+  if (!userId) return null;
 
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr) throw new Error(authErr.message);
-  mustAuthUserId(authData.user?.id);
+  const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
     .from('projects')
@@ -73,10 +85,7 @@ export async function getProjectById(projectId: string): Promise<ProjectRow | nu
 
 export async function createProject(input: { project_key: string; name: string }): Promise<ProjectRow> {
   const supabase = await createSupabaseServerClient();
-
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr) throw new Error(authErr.message);
-  const userId = mustAuthUserId(authData.user?.id);
+  const userId = await requireUserId();
 
   const project_key = input.project_key.trim();
   const name = input.name.trim();
@@ -84,20 +93,14 @@ export async function createProject(input: { project_key: string; name: string }
   if (!project_key) throw new Error('project_key is required');
   if (!name) throw new Error('name is required');
 
-  // RLS insert policy требует owner_id = auth.uid() (или admin)
   const { data: inserted, error } = await supabase
     .from('projects')
-    .insert({
-      project_key,
-      name,
-      owner_id: userId,
-    })
+    .insert({ project_key, name, owner_id: userId })
     .select('id, project_key, name, status, owner_id, created_at')
     .single();
 
   if (error) throw new Error(error.message);
 
-  // По ТЗ связь проекта с пользователем: добавляем owner в project_members
   const { error: memberErr } = await supabase.from('project_members').insert({
     project_id: inserted.id,
     user_id: userId,
@@ -111,10 +114,7 @@ export async function createProject(input: { project_key: string; name: string }
 
 export async function updateProject(projectId: string, patch: { name?: string }): Promise<ProjectRow> {
   const supabase = await createSupabaseServerClient();
-
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr) throw new Error(authErr.message);
-  mustAuthUserId(authData.user?.id);
+  await requireUserId();
 
   const updatePayload: any = {};
   if (typeof patch.name === 'string') updatePayload.name = patch.name.trim();
@@ -132,10 +132,7 @@ export async function updateProject(projectId: string, patch: { name?: string })
 
 export async function archiveProject(projectId: string): Promise<ProjectRow> {
   const supabase = await createSupabaseServerClient();
-
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr) throw new Error(authErr.message);
-  mustAuthUserId(authData.user?.id);
+  await requireUserId();
 
   const { data, error } = await supabase
     .from('projects')
@@ -148,19 +145,11 @@ export async function archiveProject(projectId: string): Promise<ProjectRow> {
   return data as ProjectRow;
 }
 
-export type ProjectMemberRow = {
-  project_id: string;
-  user_id: string;
-  role_in_project: 'owner' | 'member';
-  created_at: string;
-};
-
 export async function listProjectMembers(projectId: string): Promise<ProjectMemberRow[]> {
-  const supabase = await createSupabaseServerClient();
+  const userId = await getUserIdOrNull();
+  if (!userId) return [];
 
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr) throw new Error(authErr.message);
-  mustAuthUserId(authData.user?.id);
+  const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
     .from('project_members')
@@ -178,26 +167,15 @@ export async function addProjectMember(input: {
   role_in_project: 'member' | 'owner';
 }): Promise<void> {
   const supabase = await createSupabaseServerClient();
+  await requireUserId();
 
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr) throw new Error(authErr.message);
-  mustAuthUserId(authData.user?.id);
-
-  const { error } = await supabase.from('project_members').insert({
-    project_id: input.project_id,
-    user_id: input.user_id,
-    role_in_project: input.role_in_project,
-  });
-
+  const { error } = await supabase.from('project_members').insert(input);
   if (error) throw new Error(error.message);
 }
 
 export async function removeProjectMember(input: { project_id: string; user_id: string }): Promise<void> {
   const supabase = await createSupabaseServerClient();
-
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr) throw new Error(authErr.message);
-  mustAuthUserId(authData.user?.id);
+  await requireUserId();
 
   const { error } = await supabase
     .from('project_members')
