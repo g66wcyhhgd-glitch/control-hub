@@ -2,6 +2,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
+type CookieToSet = {
+  name: string;
+  value: string;
+  options?: any;
+};
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -10,6 +16,7 @@ export async function middleware(request: NextRequest) {
   const supabaseAnonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
 
+  // Если env ещё не настроены — просто пропускаем middleware
   if (!supabaseUrl || !supabaseAnonKey) return response;
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -17,16 +24,16 @@ export async function middleware(request: NextRequest) {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: CookieToSet[]) {
         response = NextResponse.next({ request });
-        for (const { name, value, options } of cookiesToSet as any[]) {
+        for (const { name, value, options } of cookiesToSet) {
           response.cookies.set(name, value, options);
         }
       },
     },
   });
 
-  // важно: это обновляет сессию в cookies
+  // refresh session cookies
   await supabase.auth.getUser();
 
   return response;
