@@ -4,6 +4,12 @@ import 'server-only';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 
+type CookieToSet = {
+  name: string;
+  value: string;
+  options?: any;
+};
+
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
 
@@ -26,19 +32,15 @@ export async function createSupabaseServerClient() {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet: any[]) {
-  try {
-    for (const { name, value, options } of cookiesToSet) {
-      cookieStore.set(name, value, options);
-    }
-  } catch {
-    // ignore
-  }
-}
-
-          // ignore
+      setAll(cookiesToSet: CookieToSet[]) {
+        try {
+          for (const { name, value, options } of cookiesToSet) {
+            cookieStore.set(name, value, options);
+          }
+        } catch {
+          // ignore (server components sometimes can't set cookies)
         }
-      }
-    }
+      },
+    },
   });
 }
