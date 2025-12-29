@@ -1,4 +1,3 @@
-// apps/web/middleware.ts
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
@@ -16,8 +15,8 @@ function isPublicPath(pathname: string) {
     pathname.startsWith('/projects') ||
     pathname.startsWith('/invites') || // TZ#2: allow accept invite without active project
     pathname.startsWith('/auth') ||
-    pathname.startsWith('/api')
-    pathname.startsWith('/api/webhooks')
+    pathname.startsWith('/api') || // existing logic (health, auth callback, etc.)
+    pathname.startsWith('/api/webhooks') // TZ#3: webhook endpoint must be public
   );
 }
 
@@ -33,44 +32,70 @@ export async function middleware(request: NextRequest) {
   const supabaseAnonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
 
+  const cookiesToSet: CookieToSet[] = [];
+
   if (supabaseUrl && supabaseAnonKey) {
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet: CookieToSet[]) {
+        setAll(newCookies: CookieToSet[]) {
+          // сохраняем cookies, чтобы можно было применить и на redirect response
+          cookiesToSet.push(...newCookies);
+
+          // и применяем на текущий response
           response = NextResponse.next({ request });
-          for (const { name, value, options } of cookiesToSet) {
+          for (const { name, value, options } of newCookies) {
             response.cookies.set(name, value, options);
           }
         },
       },
     });
 
-    // refresh session cookies
-    await supabase.auth.getUser();
-  }
+    // refresh session / get user
+    const { data } = await supabase.auth.getUser();
+    const user = data?.user ?? null;
 
-  // 3) Project guard (только для непубличных путей)
-  if (!isPublicPath(pathname)) {
-    const activeProjectId =
-      request.cookies.get(ACTIVE_PROJECT_COOKIE)?.value ?? null;
+    // 3) Allow public paths
+    if (isPublicPath(pathname)) {
+      return response;
+    }
+
+    // 4) Require auth
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.searchParams.set('next', pathname);
+
+      const redirectResponse = NextResponse.redirect(url);
+      for (const { name, value, options } of cookiesToSet) {
+        redirectResponse.cookies.set(name, value, options);
+      }
+      return redirectResponse;
+    }
+
+    // 5) Require active project cookie
+    const activeProjectId = request.cookies.get(ACTIVE_PROJECT_COOKIE)?.value;
 
     if (!activeProjectId) {
       const url = request.nextUrl.clone();
       url.pathname = '/projects';
-      url.searchParams.set('need_project', '1');
-      url.searchParams.set('next', pathname);
-      return NextResponse.redirect(url);
+
+      const redirectResponse = NextResponse.redirect(url);
+      for (const { name, value, options } of cookiesToSet) {
+        redirectResponse.cookies.set(name, value, options);
+      }
+      return redirectResponse;
     }
+
+    return response;
   }
 
+  // Если ENV Supabase нет — пропускаем без auth-gating (как было в фундаменте)
   return response;
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
