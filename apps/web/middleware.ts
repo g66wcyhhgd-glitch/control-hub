@@ -17,6 +17,7 @@ function isPublicPath(pathname: string) {
     pathname.startsWith('/invites') || // TZ#2: allow accept invite without active project
     pathname.startsWith('/auth') ||
     pathname.startsWith('/api')
+    pathname.startsWith('/api/webhooks')
   );
 }
 
